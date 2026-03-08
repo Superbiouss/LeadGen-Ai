@@ -404,3 +404,23 @@ tr:hover td {
     font-size: 3rem;
   }
 }
+.input-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+  margin-top: 0.5rem;
+}
+
+.setup-notice code {
+  background: var(--color-surface-dim);
+  padding: 0.1rem 0.3rem;
+  color: var(--color-primary);
+  font-family: monospace;
+}
+
+.setup-notice ol {
+  margin-top: 1rem;
+}
+
+.setup-notice li {
+  margin-bottom: 0.5rem;
+}

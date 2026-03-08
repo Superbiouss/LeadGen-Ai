@@ -63,6 +63,15 @@
                         </svg>
                         <span>Analytics</span>
                     </a></li>
+                <li><a href="#" class="nav-item" data-section="settings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                        <span>Settings</span>
+                    </a></li>
             </ul>
         </nav>
     </aside>
@@ -180,6 +189,7 @@
                                 <th>Phone</th>
                                 <th>Email</th>
                                 <th>Status</th>
+                                <th>Maps</th>
                             </tr>
                         </thead>
                         <tbody id="leads-table-body">
@@ -190,18 +200,50 @@
             </div>
         </section>
 
-        <!-- Analytics Section -->
-        <section id="analytics" class="section">
-            <div class="stats-grid">
-                <div class="glass-card" style="grid-column: span 2">
-                    <span class="section-tag">Growth Curve</span>
-                    <h3>Leads Growth (Last 7 Days)</h3>
-                    <canvas id="growthChart" height="200"></canvas>
-                </div>
-                <div class="glass-card">
-                    <span class="section-tag">Distribution</span>
-                    <h3>Lead Sources</h3>
-                    <canvas id="sourceChart" height="200"></canvas>
+        </div>
+        </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <div class="glass-card" style="max-width: 800px; margin: 0 auto">
+                <span class="section-tag">System Configuration</span>
+                <h2 style="margin-bottom: 2rem">Integration Settings</h2>
+
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="webhook-url">N8N Trigger Webhook URL</label>
+                        <input type="url" id="webhook-url" placeholder="https://your-n8n.com/webhook/..." required>
+                        <p class="input-hint">The URL of your "Manual Trigger" node in N8N.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="leads-api-url">Leads Data API URL</label>
+                        <input type="url" id="leads-api-url" placeholder="https://your-n8n.com/webhook/leads-api">
+                        <p class="input-hint">The URL of your N8N workflow that fetches leads from Google Sheets.</p>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; margin-top: 2rem">
+                        <button type="submit" class="btn">Save Configuration</button>
+                        <button type="button" class="btn" id="reset-settings"
+                            style="background: var(--color-surface-dim); border: 1px solid var(--border)">Reset to
+                            Defaults</button>
+                    </div>
+                </form>
+
+                <div class="setup-notice"
+                    style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border)">
+                    <span class="section-tag" style="color: var(--color-text-dim)">Instructions</span>
+                    <h3 style="font-size: 1.2rem; margin-bottom: 1rem">Connecting your Lead Vault</h3>
+                    <p style="font-size: 0.9rem; color: var(--color-text-sub); margin-bottom: 1rem">
+                        To see real leads in the "Leads Vault", create a separate n8n workflow:
+                    </p>
+                    <ol style="font-size: 0.9rem; color: var(--color-text-sub); padding-left: 1.5rem">
+                        <li>Add a <strong>Webhook</strong> node (Method: GET, Path: <code>leads-api</code>).</li>
+                        <li>Add a <strong>Google Sheets</strong> node to <i>Get Many</i> from your Leads sheet.</li>
+                        <li>Add a <strong>Respond to Webhook</strong> node to return the data.</li>
+                        <li>Paste the production URL in the "Leads Data API URL" field above.</li>
+                    </ol>
                 </div>
             </div>
         </section>

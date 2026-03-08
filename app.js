@@ -1,6 +1,7 @@
 // Configuration
 const CONFIG = {
-    N8N_WEBHOOK_URL: 'YOUR_N8N_PRODUCTION_URL_HERE' // PASTE YOUR URL HERE
+    N8N_WEBHOOK_URL: localStorage.getItem('N8N_WEBHOOK_URL') || 'http://localhost:5678/webhook/start-lead-gen',
+    LEADS_API_URL: localStorage.getItem('LEADS_API_URL') || ''
 };
 
 // State Management
@@ -20,7 +21,8 @@ const sectionMeta = {
     overview: { title: 'Dashboard Overview', subtitle: 'Monitoring your automated lead generation pipeline.' },
     scraper: { title: 'Lead Scraper', subtitle: 'Configure and launch new extraction tasks.' },
     leads: { title: 'Leads Vault', subtitle: 'Detailed view of all captured business intelligence.' },
-    analytics: { title: 'Scraping Analytics', subtitle: 'Performance metrics and growth trends.' }
+    analytics: { title: 'Scraping Analytics', subtitle: 'Performance metrics and growth trends.' },
+    settings: { title: 'System Settings', subtitle: 'Configure your N8N integrations and API endpoints.' }
 };
 
 navItems.forEach(item => {
@@ -46,7 +48,11 @@ function switchSection(target) {
     pageSubtitle.textContent = sectionMeta[target].subtitle;
 
     if (target === 'leads' && state.leads.length === 0) {
-        generateMockLeads();
+        fetchLeads();
+    }
+
+    if (target === 'settings') {
+        loadSettings();
     }
 
     if (target === 'analytics') {
@@ -54,21 +60,10 @@ function switchSection(target) {
     }
 }
 
-// Mock Lead Generation
-function generateMockLeads() {
-    const names = ['The Gourmet Bistro', 'Cafe Sunshine', 'Ocean View Diner', 'TechNova Solutions', 'Green Leaf Organics', 'Blue Horizon Marketing', 'Metropolis Fitness', 'Urban Threads', 'Heritage Antiques', 'Stellar Software'];
-    const locations = ['Mumbai, IN', 'New York, US', 'London, UK', 'Berlin, DE', 'Tokyo, JP', 'Sydney, AU', 'Paris, FR', 'Toronto, CA'];
-
-    state.leads = Array.from({ length: 15 }, (_, i) => ({
-        id: i,
-        name: names[Math.floor(Math.random() * names.length)],
-        location: locations[Math.floor(Math.random() * locations.length)],
-        phone: `+1 ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-        email: `contact@${names[Math.floor(Math.random() * names.length)].toLowerCase().replace(/\s+/g, '')}.com`,
-        status: Math.random() > 0.3 ? 'Operational' : 'Closed'
-    }));
-
+// Initial state
+function init() {
     renderLeads();
+    initCharts();
 }
 
 function renderLeads() {
@@ -82,8 +77,27 @@ function renderLeads() {
             <td>${lead.phone}</td>
             <td>${lead.email}</td>
             <td><span class="badge ${lead.status === 'Operational' ? 'badge-success' : 'badge-warning'}">${lead.status}</span></td>
+            <td>
+                ${lead.maps_url ? `<a href="${lead.maps_url}" target="_blank" class="link-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                </a>` : '-'}
+            </td>
         </tr>
     `).join('');
+
+    // Dynamic Stats
+    const totalLeads = state.leads.length;
+    const verifiedEmails = state.leads.filter(l => l.email && l.email !== 'N/A').length;
+
+    const totalLeadsEl = document.querySelector('.stat-card:nth-child(1) .stat-value');
+    const verifiedEmailsEl = document.querySelector('.stat-card:nth-child(2) .stat-value');
+
+    if (totalLeadsEl) totalLeadsEl.innerHTML = `${totalLeads.toLocaleString()} <span class="stat-trend trend-up">Vault</span>`;
+    if (verifiedEmailsEl) verifiedEmailsEl.innerHTML = `${verifiedEmails.toLocaleString()} <span class="stat-trend trend-up">Live</span>`;
 }
 
 // Scraper Logic
@@ -101,31 +115,18 @@ scraperForm?.addEventListener('submit', async (e) => {
     startBtn.innerHTML = '<span class="loader"></span> Initiating...';
     startBtn.style.opacity = '0.7';
 
-    // Trigger N8N Webhook
+    // Trigger N8N Webhook with Timeout
     try {
-        const response = await fetch(CONFIG.N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                keyword: keyword,
-                location: location,
-                timestamp: new Date().toISOString()
-            })
-        });
+        const url = new URL(CONFIG.N8N_WEBHOOK_URL);
+        url.searchParams.append('keyword', keyword);
+        url.searchParams.append('location', location);
+        url.searchParams.append('maxResults', document.getElementById('max-results').value || 20);
 
-        if (!response.ok) throw new Error('Network response was not ok');
-
-        state.isScraping = false;
-        startBtn.innerHTML = 'Initialize Scraper';
-        startBtn.style.opacity = '1';
-        alert(`Scraper triggered successfully! Check N8N for progress.`);
-
-        // Add to activity log
+        // Add to activity log immediately
         const activityLog = document.getElementById('activity-log');
+        const logId = Date.now();
         const newRow = `
-            <tr>
+            <tr id="log-${logId}">
                 <td>Just now</td>
                 <td>Search Triggered</td>
                 <td>"${keyword} in ${location}"</td>
@@ -133,6 +134,30 @@ scraperForm?.addEventListener('submit', async (e) => {
             </tr>
         `;
         activityLog.insertAdjacentHTML('afterbegin', newRow);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        state.isScraping = false;
+        startBtn.innerHTML = 'Initialize Scraper';
+        startBtn.style.opacity = '1';
+
+        // Update log status to complete
+        const logStatus = document.querySelector(`#log-${logId} .badge`);
+        if (logStatus) {
+            logStatus.className = 'badge badge-success';
+            logStatus.textContent = 'Complete';
+        }
+
+        alert(`Scraper triggered successfully! \n\nCheck n8n 'Executions' to verify if leads were found or filtered out.`);
         switchSection('overview');
 
     } catch (error) {
@@ -140,7 +165,19 @@ scraperForm?.addEventListener('submit', async (e) => {
         state.isScraping = false;
         startBtn.innerHTML = 'Initialize Scraper';
         startBtn.style.opacity = '1';
-        alert(`Failed to trigger scraper. Please check your N8N Webhook URL and connection.`);
+
+        // Update log status to failed/timeout
+        const logId = document.querySelector('#activity-log tr')?.id;
+        const logStatus = document.querySelector(`#${logId} .badge`);
+        if (logStatus) {
+            logStatus.className = 'badge badge-danger';
+            logStatus.textContent = error.name === 'AbortError' ? 'Timeout' : 'Failed';
+        }
+
+        const msg = error.name === 'AbortError'
+            ? 'The scraper is taking a long time. It might still be running in n8n, check your "Executions" tab.'
+            : 'Failed to trigger scraper. Please check your N8N URL.';
+        alert(msg);
     }
 });
 
@@ -214,3 +251,80 @@ function initCharts() {
         });
     }
 }
+// Settings Logic
+function loadSettings() {
+    document.getElementById('webhook-url').value = CONFIG.N8N_WEBHOOK_URL;
+    document.getElementById('leads-api-url').value = CONFIG.LEADS_API_URL;
+}
+
+const settingsForm = document.getElementById('settings-form');
+settingsForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    CONFIG.N8N_WEBHOOK_URL = document.getElementById('webhook-url').value;
+    CONFIG.LEADS_API_URL = document.getElementById('leads-api-url').value;
+
+    localStorage.setItem('N8N_WEBHOOK_URL', CONFIG.N8N_WEBHOOK_URL);
+    localStorage.setItem('LEADS_API_URL', CONFIG.LEADS_API_URL);
+
+    alert('Settings saved successfully!');
+});
+
+document.getElementById('reset-settings')?.addEventListener('click', () => {
+    localStorage.removeItem('N8N_WEBHOOK_URL');
+    localStorage.removeItem('LEADS_API_URL');
+    location.reload();
+});
+
+// Real Lead Fetching
+async function fetchLeads() {
+    if (!CONFIG.LEADS_API_URL) {
+        console.log('Leads API URL not configured.');
+        const tbody = document.getElementById('leads-table-body');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888880; padding: 40px;">Please configure <strong>Leads Data API URL</strong> in Settings to view your leads.</td></tr>';
+        }
+        return;
+    }
+
+    try {
+        const tbody = document.getElementById('leads-table-body');
+        if (tbody && state.leads.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888880; padding: 40px;">Fetching latest leads from vault...</td></tr>';
+        }
+
+        const response = await fetch(CONFIG.LEADS_API_URL);
+        if (!response.ok) throw new Error('Failed to fetch leads');
+
+        const data = await response.json();
+        const leadsData = Array.isArray(data) ? data : (data.data || []);
+
+        if (leadsData.length === 0) {
+            state.leads = [];
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888880; padding: 40px;">No leads found in your vault yet. Run a scan to get started!</td></tr>';
+            }
+            return;
+        }
+
+        state.leads = leadsData.map((lead, i) => ({
+            id: i,
+            name: lead['Business Name'] || lead.name || 'Unknown',
+            location: lead['Address / Location'] || lead.location || 'Unknown',
+            phone: lead['Phone Number'] || lead.phone || 'N/A',
+            email: lead['Email'] || lead.email || 'N/A',
+            status: lead['Status'] || lead.status || 'Active',
+            maps_url: lead['Google Maps URL'] || lead.google_maps_url || null
+        }));
+
+        renderLeads();
+    } catch (error) {
+        console.error('Error fetching real leads:', error);
+        const tbody = document.getElementById('leads-table-body');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #e8192c; padding: 40px;">Error connecting to Leads API. Check your Settings.</td></tr>';
+        }
+    }
+}
+
+// Start application
+init();
